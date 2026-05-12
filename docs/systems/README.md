@@ -19,12 +19,13 @@
 | 13 | [13_HOT_UPDATE_SYSTEM.md](13_HOT_UPDATE_SYSTEM.md) | 热更新系统 |
 | 14 | [14_NETWORK_SYSTEM.md](14_NETWORK_SYSTEM.md) | 网络层系统 |
 | 15 | [15_HALL_SUBGAME_SYSTEM.md](15_HALL_SUBGAME_SYSTEM.md) | 大厅与子游戏系统 |
+| 16 | [16_UI_PREFAB_BINDING.md](16_UI_PREFAB_BINDING.md) | UI Prefab 制作与绑定生成 |
 
 阅读建议：
 
 1. 先读 `FRAMEWORK_OVERVIEW.md`，理解整体架构、目录结构和系统依赖。
 2. 实现 P0 时读 01、02、03、04。
-3. 实现 P1 时读 06、07、08，并给资源系统预留版本接口。
+3. 实现 P1 时读 06、07、08、16，并给资源系统预留版本接口。
 4. 实现 P2 时读 09、10、11、13、14。
 5. 实现 P3 时读 05、12。
 6. 实现大厅 + 多子游戏模式时读 04、05、07、08、12、15。

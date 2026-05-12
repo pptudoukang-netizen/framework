@@ -1,0 +1,76 @@
+{
+  "prefabRoots": [
+    "assets/prefabs/ui"
+  ],
+  "scriptOutputRoot": "assets/scripts/modules",
+  "generatedDirName": "generated",
+  "requireRootNameMatch": true,
+  "baseViewPath": "assets/scripts/core/ui/UIView.ts",
+  "nodeBinderPath": "assets/scripts/core/ui/NodeBinder.ts",
+  "prefixes": {
+    "node": {
+      "type": "Node",
+      "fieldSuffix": "Node"
+    },
+    "btn": {
+      "type": "Button",
+      "fieldSuffix": "Button"
+    },
+    "lbl": {
+      "type": "Label",
+      "fieldSuffix": "Label"
+    },
+    "rich": {
+      "type": "RichText",
+      "fieldSuffix": "RichText"
+    },
+    "spr": {
+      "type": "Sprite",
+      "fieldSuffix": "Sprite"
+    },
+    "toggle": {
+      "type": "Toggle",
+      "fieldSuffix": "Toggle"
+    },
+    "edit": {
+      "type": "EditBox",
+      "fieldSuffix": "EditBox"
+    },
+    "scroll": {
+      "type": "ScrollView",
+      "fieldSuffix": "ScrollView"
+    },
+    "progress": {
+      "type": "ProgressBar",
+      "fieldSuffix": "ProgressBar"
+    },
+    "slider": {
+      "type": "Slider",
+      "fieldSuffix": "Slider"
+    },
+    "layout": {
+      "type": "Layout",
+      "fieldSuffix": "Layout"
+    },
+    "page": {
+      "type": "PageView",
+      "fieldSuffix": "PageView"
+    },
+    "mask": {
+      "type": "Mask",
+      "fieldSuffix": "Mask"
+    },
+    "graphics": {
+      "type": "Graphics",
+      "fieldSuffix": "Graphics"
+    },
+    "anim": {
+      "type": "Animation",
+      "fieldSuffix": "Animation"
+    },
+    "widget": {
+      "type": "Widget",
+      "fieldSuffix": "Widget"
+    }
+  }
+}

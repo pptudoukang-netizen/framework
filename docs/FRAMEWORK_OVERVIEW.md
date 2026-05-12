@@ -23,6 +23,7 @@
 | [热更新系统](systems/13_HOT_UPDATE_SYSTEM.md) | HotUpdateService、Manifest、版本检查、搜索路径适配 |
 | [网络层系统](systems/14_NETWORK_SYSTEM.md) | NetworkService、HTTP、WebSocket、心跳重连、消息路由 |
 | [大厅与子游戏系统](systems/15_HALL_SUBGAME_SYSTEM.md) | 单 Boot 场景容器、大厅、多子游戏生命周期、GameplayRoot |
+| [UI Prefab 制作与绑定生成](systems/16_UI_PREFAB_BINDING.md) | prefab 命名规范、绑定脚本自动生成、生成校验 |
 | [基础类完整清单](FRAMEWORK_CLASS_ARCHITECTURE.md) | 所有基础类的详细职责与开发任务 |
 
 ---

@@ -3,7 +3,9 @@
   "uuid": "7f143d30-2e61-450f-a73b-ee2c59685324",
   "scripts": {
     "hotupdate:manifest": "node tools/hotupdate/generate-manifest.js --config tools/hotupdate/hotupdate.config.json",
-    "proto:generate": "node tools/proto/generate-ts-proto.js"
+    "proto:generate": "node tools/proto/generate-ts-proto.js",
+    "ui:generate": "node tools/ui-binding/generate-ui-bindings.js --config tools/ui-binding/ui-binding.config.json",
+    "ui:check": "node tools/ui-binding/generate-ui-bindings.js --config tools/ui-binding/ui-binding.config.json --check"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.0"
