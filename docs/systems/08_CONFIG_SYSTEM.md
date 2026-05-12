@@ -96,6 +96,11 @@ export interface SubGameConfig {
   readonly settlementMode: 'common' | 'custom'
   readonly requiredConfigs: readonly string[]
   readonly preloadResources: readonly string[]
+  readonly hotUpdate: {
+    readonly localManifestPath?: string
+    readonly remoteVersionUrl?: string
+    readonly remoteManifestUrl?: string
+  }
 }
 ```
 
@@ -110,6 +115,7 @@ export interface SubGameConfig {
 - `subgame_config.id` 重复直接抛错。
 - `subgame_config` 引用不存在的 UI、资源、配置或子游戏模块时直接抛错。
 - `settlementMode` 非法直接抛错。
+- 开启全局子游戏独立热更新时，子游戏 manifest 路径和远端 URL 缺失直接抛错。
 - `ConfigTable.get(id)` 不存在时直接抛错。
 - 不允许自动补默认值。
 

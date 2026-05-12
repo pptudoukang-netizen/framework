@@ -1,0 +1,17 @@
+[
+  {
+    "id": "exampleGame",
+    "displayName": "Example Game",
+    "bundle": "exampleGame",
+    "entryPrefab": "prefabs/ExampleGameRoot",
+    "loadingUiId": "SubGameLoadingUI",
+    "settlementMode": "common",
+    "requiredConfigs": [],
+    "preloadResources": [],
+    "hotUpdate": {
+      "localManifestPath": "subgames/exampleGame/project.manifest",
+      "remoteVersionUrl": "https://example.com/subgames/exampleGame/version.manifest",
+      "remoteManifestUrl": "https://example.com/subgames/exampleGame/project.manifest"
+    }
+  }
+]

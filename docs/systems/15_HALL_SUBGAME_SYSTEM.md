@@ -13,6 +13,8 @@
 - 子游戏是独立业务模块，必须通过统一协议接入。
 - 主流程由 FSM 编排，不用 EventBus 串完整进入和退出流程。
 - 子游戏资源必须通过 ResourceManager 加载，并在退出时按 owner 释放。
+- 每个子游戏必须以 Asset Bundle 作为资源边界，通过 `subgame_config.bundle` 加载。
+- 子游戏是否独立热更新由全局策略开关控制；开关关闭时，启动更新包含全部子游戏内容。
 - 子游戏不能直接修改大厅、货币、背包、任务等模块内部 Model。
 - 子游戏只能产出明确结果，奖励、货币、背包变更由结算流程调用对应 Service 完成。
 - 不允许缺子游戏配置、缺资源、缺 prefab 后 fallback 到默认游戏或 mock 数据。
@@ -222,6 +224,11 @@ export interface SubGameConfig {
   readonly settlementMode: 'common' | 'custom'
   readonly requiredConfigs: readonly string[]
   readonly preloadResources: readonly string[]
+  readonly hotUpdate: {
+    readonly localManifestPath?: string
+    readonly remoteVersionUrl?: string
+    readonly remoteManifestUrl?: string
+  }
 }
 ```
 
@@ -232,10 +239,38 @@ export interface SubGameConfig {
 - `settlementMode` 只能是 `common` 或 `custom`。
 - `requiredConfigs` 引用的配置必须存在。
 - `preloadResources` 引用的资源必须存在。
+- 当全局 `subGameIndependentUpdateEnabled=true` 时，`hotUpdate.localManifestPath`、`hotUpdate.remoteVersionUrl`、`hotUpdate.remoteManifestUrl` 必须非空。
 - 子游戏模块注册表中必须存在同名 `gameId`。
 - 不允许缺字段后自动补默认值。
 
-## 10. 进入子游戏流程
+## 10. 子游戏独立热更新
+
+子游戏热更新由 `SubGameHotUpdateService` 负责，只在全局 `subGameIndependentUpdateEnabled=true` 时进入子游戏前执行：
+
+```text
+Hall
+-> SubGameLoading
+-> 读取 subgame_config
+-> 若 subGameIndependentUpdateEnabled=true，检查并应用该子游戏 manifest
+-> 更新该 bundle 的资源版本
+-> 通过 ResourceManager 加载子游戏 bundle 和 entryPrefab
+-> SubGameRunning
+```
+
+规则：
+
+- 全局热更新仍由 `HotUpdateService` 在启动流程处理。
+- `subGameIndependentUpdateEnabled=true` 时，启动更新只处理大厅、框架和公共模块；子游戏进入时按需单独更新对应 bundle。
+- `subGameIndependentUpdateEnabled=false` 时，启动更新处理整个项目，包括所有子游戏 bundle；进入子游戏时不再检查子游戏更新。
+- 子游戏独立热更新只处理当前 `gameId` 对应的 bundle。
+- 全局开关关闭时不允许偷偷检查子游戏远端版本，也不允许使用 mock 更新结果。
+- 开关开启但平台不支持热更新时必须暴露错误。
+- 开关开启但 manifest 配置缺失时必须暴露错误。
+- 子游戏 manifest 必须由 `tools/hotupdate/generate-manifest.js` 的 `subgame-<gameId>` target 生成，输出路径要与 `subgame_config.hotUpdate.localManifestPath` 对齐。
+- 更新完成后如果要求重启，不能继续进入子游戏。
+- `ResourceVersionProvider` 必须支持按 bundle 获取资源版本，避免不同子游戏 bundle 缓存串版本。
+
+## 11. 进入子游戏流程
 
 ```mermaid
 sequenceDiagram
@@ -244,7 +279,9 @@ sequenceDiagram
   participant Hall as HallService
   participant FSM as GameStateMachine
   participant Loading as SubGameLoadingState
+  participant Update as SubGameHotUpdateService
   participant Lifecycle as SubGameLifecycleService
+  participant Res as ResourceManager
   participant Game as SubGameModule
 
   HallUI->>HallCtrl: click game entry
@@ -252,12 +289,14 @@ sequenceDiagram
   Hall->>Hall: validate subgame_config
   Hall->>FSM: changeTo(SubGameLoading, params)
   Loading->>Lifecycle: preload(gameId, params)
+  Lifecycle->>Update: checkAndApply(subgame_config)
+  Lifecycle->>Res: loadPrefab(bundle, entryPrefab)
   Lifecycle->>Game: preload(params)
   Loading->>FSM: changeTo(SubGameRunning, params)
   Lifecycle->>Game: enter(params)
 ```
 
-## 11. 退出和结算流程
+## 12. 退出和结算流程
 
 ```mermaid
 sequenceDiagram
@@ -285,7 +324,7 @@ sequenceDiagram
 - 如果清理失败必须抛错或上报明确错误，不允许静默留脏节点。
 - 结算失败不能直接返回大厅并伪装成功。
 
-## 12. 资源生命周期
+## 13. 资源生命周期
 
 资源 ownerId 建议格式：
 
@@ -298,7 +337,9 @@ subgame:<gameId>:<runId>:<resourceVersion>
 - 校验 `subgame_config`。
 - 生成本次运行的 `runId`。
 - 加载 `requiredConfigs`。
-- 预加载 `preloadResources`。
+- 如果开启子游戏独立热更新，先检查并应用该 bundle 的更新。
+- 通过 `ResourceManager.loadPrefab(config.bundle, config.entryPrefab)` 加载入口 prefab。
+- 通过 `ResourceManager.load(config.bundle, path, type)` 预加载 `preloadResources`。
 - 创建玩法 prefab 并挂到 `GameplayRoot`。
 
 退出子游戏：
@@ -310,7 +351,7 @@ subgame:<gameId>:<runId>:<resourceVersion>
 - 调用 `ResourceManager.releaseByOwner(ownerId)`。
 - 清空子游戏 Model 的临时运行状态。
 
-## 13. EventBus 使用边界
+## 14. EventBus 使用边界
 
 适合使用 EventBus：
 
@@ -326,7 +367,7 @@ subgame:<gameId>:<runId>:<resourceVersion>
 - 用事件链跨模块修改其他模块 Model。
 - 用事件吞掉进入、加载、结算失败。
 
-## 14. Fail-Fast 规则
+## 15. Fail-Fast 规则
 
 - `GameplayRoot` 未绑定直接报错。
 - `gameId` 不存在直接报错。
@@ -334,11 +375,14 @@ subgame:<gameId>:<runId>:<resourceVersion>
 - 子游戏配置缺字段直接报错。
 - 子游戏 prefab 缺失直接报错。
 - 子游戏资源加载失败直接报错。
+- 子游戏 bundle 缺失或加载失败直接报错。
+- 子游戏独立热更新开启但 manifest 缺失直接报错。
+- 子游戏独立热更新开启但平台不支持直接报错。
 - 子游戏非法状态切换直接报错。
 - 子游戏退出后仍有未释放 owner 资源必须暴露错误。
 - 结算奖励配置缺失直接报错。
 
-## 15. 开发任务
+## 16. 开发任务
 
 1. 在 `Boot.scene` 增加 `GameplayRoot` 并由 `AppBootstrap` 显式绑定。
 2. 新增 `GameplayRootService` 并注册到 `AppContext`。
@@ -351,12 +395,18 @@ subgame:<gameId>:<runId>:<resourceVersion>
 9. 新增 `HallModule` 与 `HallUI`。
 10. 接入一个最小 `exampleGame` 子游戏，验证从大厅进入、运行、退出、结算、返回大厅。
 11. 增加资源释放验收，确保退出子游戏后 `GameplayRoot` 为空且 owner 资源释放。
+12. 新增 `SubGameHotUpdateService`，按全局 `subGameIndependentUpdateEnabled` 控制是否检查子游戏独立更新。
+13. 修改资源版本策略，支持按 bundle 获取资源版本。
+14. 确保子游戏入口 prefab 和预加载资源都通过 `subgame_config.bundle` 加载。
 
-## 16. 验收标准
+## 17. 验收标准
 
 - 项目启动后进入大厅，而不是直接进入某个固定玩法。
 - 大厅能通过配置展示子游戏入口。
 - 至少一个示例子游戏能完整跑通进入、退出、结算、返回大厅。
 - 子游戏退出后不会残留节点、timer、事件订阅和资源 owner。
 - 子游戏失败会暴露明确错误，不会 fallback 到默认子游戏。
+- 全局子游戏独立热更新开关关闭时，启动更新包含子游戏，进入子游戏不会访问子游戏远端 manifest。
+- 全局子游戏独立热更新开关开启时，启动更新只处理大厅和公共模块，进入子游戏会在加载 bundle 前完成该子游戏检查和应用。
+- 不同子游戏 bundle 的资源版本和缓存互不污染。
 - 大厅和子游戏之间没有内部 Model 穿透。

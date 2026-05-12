@@ -1,4 +1,6 @@
 export * from './example';
+export * from './hall';
+export * from './subgames';
 export * from './bag/BagService';
 export * from './currency/CurrencyService';
 export * from './level/LevelService';

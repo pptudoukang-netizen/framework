@@ -1,5 +1,6 @@
 export interface ResourceVersionProvider {
   getResourceVersion(): string;
+  getBundleVersion(bundleName: string): string;
   getSearchPaths(): readonly string[];
 }
 
@@ -13,6 +14,10 @@ export class StaticResourceVersionProvider implements ResourceVersionProvider {
   }
 
   public getResourceVersion(): string {
+    return this.version;
+  }
+
+  public getBundleVersion(_bundleName: string): string {
     return this.version;
   }
 

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package framework.network.example;
+
+message ExampleEchoRequest {
+  string text = 1;
+  uint64 client_time_ms = 2;
+}
+
+message ExampleEchoResponse {
+  string text = 1;
+  uint64 server_time_ms = 2;
+}
+
+message ExampleNoticePush {
+  string text = 1;
+  uint32 level = 2;
+}

@@ -20,15 +20,25 @@ import { AudioManager } from '../audio/AudioManager';
 import { UIRoot } from '../ui/UIRoot';
 import { UIManager } from '../ui/UIManager';
 import { ModuleRegistry } from '../module/ModuleRegistry';
+import { GameplayRootService } from '../gameplay/GameplayRootService';
+import { SubGameHotUpdateService } from '../gameplay/SubGameHotUpdateService';
+import { SubGameLifecycleService } from '../gameplay/SubGameLifecycleService';
+import { SubGameRegistry } from '../gameplay/SubGameRegistry';
+import { SubGameResourceScope } from '../gameplay/SubGameResourceScope';
 import { HotUpdateSearchPathService } from '../hotupdate/HotUpdateSearchPathService';
 import { HotUpdateManifestService } from '../hotupdate/HotUpdateManifestService';
 import { NativeHotUpdateAdapter } from '../hotupdate/NativeHotUpdateAdapter';
 import { HotUpdateService } from '../hotupdate/HotUpdateService';
+import { HotUpdateStrategyService } from '../hotupdate/HotUpdateStrategyService';
 import { AppContext } from './AppContext';
 import { CoreTokens } from './CoreTokens';
 import { GameStateMachine } from './GameStateMachine';
 import { Assert } from '../error/Assert';
 import { ExampleModule } from '../../modules/example';
+import { HallModule } from '../../modules/hall';
+import { ExampleGameModule } from '../../modules/subgames/exampleGame';
+import type { SubGameConfig } from '../../configs/SubGameConfig';
+import { SubGameConfigRepository } from '../../configs/SubGameConfigRepository';
 import { FrameworkError } from '../error/FrameworkError';
 
 const { ccclass, property } = _decorator;
@@ -37,11 +47,69 @@ const { ccclass, property } = _decorator;
 export class AppBootstrap extends Component {
   private static started = false;
 
-  @property(Node)
+  @property({
+    type: Node,
+    displayName: 'UI根节点',
+    tooltip: '必填。用于承载所有通过 UIManager 打开的界面层级，缺失时启动会直接报错。',
+  })
   public uiRootNode: Node | null = null;
 
-  @property(Node)
+  @property({
+    type: Node,
+    displayName: '音频根节点',
+    tooltip: '必填。用于承载 AudioManager 创建的音频组件，缺失时启动会直接报错。',
+  })
   public audioRootNode: Node | null = null;
+
+  @property({
+    type: Node,
+    displayName: '玩法根节点',
+    tooltip: '必填。当前子游戏入口 prefab 会挂载到该节点下，退出子游戏时会清空。',
+  })
+  public gameplayRootNode: Node | null = null;
+
+  @property({
+    displayName: '子游戏独立更新',
+    tooltip:
+      '开启：启动时只更新大厅/公共模块，进入子游戏前单独更新该子游戏 bundle。关闭：启动时全量更新，包含所有子游戏。',
+  })
+  public subGameIndependentUpdateEnabled = false;
+
+  @property({
+    displayName: '大厅壳本地Manifest',
+    tooltip: '子游戏独立更新开启时使用。只包含大厅、框架和公共模块的本地 project.manifest 路径。',
+  })
+  public shellLocalManifestPath = 'hotupdate/shell/project.manifest';
+
+  @property({
+    displayName: '大厅壳远端版本',
+    tooltip: '子游戏独立更新开启时使用。只包含大厅、框架和公共模块的远端 version.manifest URL。',
+  })
+  public shellRemoteVersionUrl = 'https://example.com/shell/version.manifest';
+
+  @property({
+    displayName: '大厅壳远端Manifest',
+    tooltip: '子游戏独立更新开启时使用。只包含大厅、框架和公共模块的远端 project.manifest URL。',
+  })
+  public shellRemoteManifestUrl = 'https://example.com/shell/project.manifest';
+
+  @property({
+    displayName: '全量本地Manifest',
+    tooltip: '子游戏独立更新关闭时使用。包含大厅、公共模块和所有子游戏的本地 project.manifest 路径。',
+  })
+  public fullLocalManifestPath = 'hotupdate/project.manifest';
+
+  @property({
+    displayName: '全量远端版本',
+    tooltip: '子游戏独立更新关闭时使用。包含大厅、公共模块和所有子游戏的远端 version.manifest URL。',
+  })
+  public fullRemoteVersionUrl = 'https://example.com/version.manifest';
+
+  @property({
+    displayName: '全量远端Manifest',
+    tooltip: '子游戏独立更新关闭时使用。包含大厅、公共模块和所有子游戏的远端 project.manifest URL。',
+  })
+  public fullRemoteManifestUrl = 'https://example.com/project.manifest';
 
   private context: AppContext | null = null;
   private gameStateMachine: GameStateMachine | null = null;
@@ -68,6 +136,19 @@ export class AppBootstrap extends Component {
 
     const hotUpdateSearchPathService = new HotUpdateSearchPathService();
     hotUpdateSearchPathService.restorePersistedSearchPaths();
+    const hotUpdateStrategyService = new HotUpdateStrategyService({
+      subGameIndependentUpdateEnabled: this.subGameIndependentUpdateEnabled,
+      shellUpdateConfig: {
+        localManifestPath: this.shellLocalManifestPath,
+        remoteVersionUrl: this.shellRemoteVersionUrl,
+        remoteManifestUrl: this.shellRemoteManifestUrl,
+      },
+      fullUpdateConfig: {
+        localManifestPath: this.fullLocalManifestPath,
+        remoteVersionUrl: this.fullRemoteVersionUrl,
+        remoteManifestUrl: this.fullRemoteManifestUrl,
+      },
+    });
 
     const resourceManager = new ResourceManager(
       logger,
@@ -77,6 +158,23 @@ export class AppBootstrap extends Component {
     );
 
     const configService = new ConfigService(resourceManager, logger, eventBus);
+    configService.registerManifest<SubGameConfig>({
+      name: 'subgame_config',
+      bundle: 'resources',
+      path: 'configs/subgame_config',
+      idField: 'id',
+      requiredFields: [
+        'id',
+        'displayName',
+        'bundle',
+        'entryPrefab',
+        'loadingUiId',
+        'settlementMode',
+        'requiredConfigs',
+        'preloadResources',
+        'hotUpdate',
+      ],
+    });
 
     const migrationPipeline = new SaveMigrationPipeline();
     const saveRepository = new SaveRepository('framework.save_data');
@@ -90,6 +188,7 @@ export class AppBootstrap extends Component {
       httpBaseUrl: 'http://127.0.0.1:8080',
       wsUrl: 'ws://127.0.0.1:8080/ws',
       requestTimeoutMs: 10000,
+      protocol: 'json',
       heartbeat: {
         intervalMs: 5000,
         timeoutMs: 15000,
@@ -132,12 +231,32 @@ export class AppBootstrap extends Component {
     const uiRoot = new UIRoot(safeUiRootNode);
     const uiManager = new UIManager(logger, resourceManager, uiRoot);
 
+    const safeGameplayRootNode = Assert.notNull(
+      this.gameplayRootNode,
+      'AppBootstrap.gameplayRootNode is required.',
+    );
+    const gameplayRootService = new GameplayRootService(safeGameplayRootNode);
+    const subGameRegistry = new SubGameRegistry();
+    const subGameConfigRepository = new SubGameConfigRepository(configService);
+    const subGameHotUpdateService = new SubGameHotUpdateService(
+      logger,
+      eventBus,
+      new NativeHotUpdateAdapter(),
+      hotUpdateSearchPathService,
+      hotUpdateStrategyService,
+    );
+    const subGameResourceScope = new SubGameResourceScope(resourceManager, hotUpdateSearchPathService);
+    const subGameLifecycleService = new SubGameLifecycleService(
+      logger,
+      subGameRegistry,
+      subGameConfigRepository,
+      subGameHotUpdateService,
+      gameplayRootService,
+      subGameResourceScope,
+    );
+
     const hotUpdateManifestService = new HotUpdateManifestService();
-    hotUpdateManifestService.setConfig({
-      localManifestPath: 'hotupdate/project.manifest',
-      remoteVersionUrl: 'https://example.com/version.manifest',
-      remoteManifestUrl: 'https://example.com/project.manifest',
-    });
+    hotUpdateManifestService.setConfig(hotUpdateStrategyService.getStartupUpdateConfig());
 
     const hotUpdateService = new HotUpdateService(
       logger,
@@ -149,6 +268,11 @@ export class AppBootstrap extends Component {
 
     const moduleRegistry = new ModuleRegistry(logger);
     moduleRegistry.register(new ExampleModule());
+    moduleRegistry.register(new HallModule());
+
+    const exampleGameModule = new ExampleGameModule();
+    moduleRegistry.register(exampleGameModule);
+    subGameRegistry.register(exampleGameModule);
 
     const context = new AppContext();
     context.register(CoreTokens.Logger, logger);
@@ -162,11 +286,18 @@ export class AppBootstrap extends Component {
     context.register(CoreTokens.TimerService, timerService);
     context.register(CoreTokens.UIManager, uiManager);
     context.register(CoreTokens.HotUpdateService, hotUpdateService);
+    context.register(CoreTokens.HotUpdateStrategyService, hotUpdateStrategyService);
     context.register(CoreTokens.NetworkService, networkService);
     context.register(CoreTokens.ModuleRegistry, moduleRegistry);
+    context.register(CoreTokens.GameplayRootService, gameplayRootService);
+    context.register(CoreTokens.SubGameConfigProvider, subGameConfigRepository);
+    context.register(CoreTokens.SubGameHotUpdateService, subGameHotUpdateService);
+    context.register(CoreTokens.SubGameRegistry, subGameRegistry);
+    context.register(CoreTokens.SubGameLifecycleService, subGameLifecycleService);
 
     this.context = context;
     this.gameStateMachine = new GameStateMachine(context);
+    context.register(CoreTokens.GameStateMachine, this.gameStateMachine);
   }
 
   protected async start(): Promise<void> {

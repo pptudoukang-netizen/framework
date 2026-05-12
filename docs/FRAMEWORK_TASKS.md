@@ -22,6 +22,7 @@
 - [x] 搭建 `AudioRoot/AudioConfigRepository/AudioManager`
 - [x] 搭建 `TimerHandle/TimerService`
 - [x] 搭建 `HotUpdateAdapter/HotUpdateService/HotUpdateManifestService/HotUpdateSearchPathService/NativeHotUpdateAdapter`
+- [x] 新增热更新 manifest 自动生成脚本、配置和命令
 - [x] 搭建 `NetworkConfig/NetworkService/HttpClient/WebSocketClient/Protocol/Router/Heartbeat/Reconnect/Auth`
 
 ## P3 模块化与业务样板
@@ -38,6 +39,9 @@
 - [ ] 新增 `HallState/SubGameLoadingState/SubGameRunningState/SubGameSettlementState`
 - [ ] 更新 `GameStateMachine` 合法转移表
 - [ ] 新增 `subgame_config` 类型、validator、repository 和跨表引用校验
+- [ ] 新增全局子游戏独立热更新开关与子游戏 manifest 配置
+- [ ] 新增 `SubGameHotUpdateService`
+- [ ] ResourceVersionProvider / BundleLoader 支持 bundle 级版本隔离
 - [ ] 新增 `HallModule/HallUI`
 - [ ] 接入一个最小 `exampleGame`，跑通大厅进入、运行、退出、结算、返回大厅
 - [ ] 验证子游戏退出后节点、事件、timer、资源 owner 全部释放

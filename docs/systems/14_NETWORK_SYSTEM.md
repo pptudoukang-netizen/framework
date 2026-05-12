@@ -61,7 +61,7 @@ assets/scripts/core/network/
 ├─ protocol/
 │  ├─ NetworkProtocolCodec.ts
 │  ├─ JsonProtocolCodec.ts
-│  ├─ BinaryProtocolCodec.ts
+│  ├─ Proto3NetworkProtocolCodec.ts
 │  ├─ MessageEnvelope.ts
 │  └─ MessageTypeRegistry.ts
 ├─ router/
@@ -100,8 +100,9 @@ assets/scripts/core/network/
 | `ReconnectPolicy` | `assets/scripts/core/network/websocket/ReconnectPolicy.ts` | 有界重连策略 |
 | `PendingRequestMap` | `assets/scripts/core/network/websocket/PendingRequestMap.ts` | WebSocket 请求响应匹配 |
 | `NetworkProtocolCodec` | `assets/scripts/core/network/protocol/NetworkProtocolCodec.ts` | 协议编码/解码接口 |
+| `Proto3NetworkProtocolCodec` | `assets/scripts/core/network/protocol/Proto3NetworkProtocolCodec.ts` | proto3 网络信封编解码 |
 | `MessageEnvelope` | `assets/scripts/core/network/protocol/MessageEnvelope.ts` | 统一消息信封 |
-| `MessageTypeRegistry` | `assets/scripts/core/network/protocol/MessageTypeRegistry.ts` | 消息类型注册表 |
+| `MessageTypeRegistry` | `assets/scripts/core/network/protocol/MessageTypeRegistry.ts` | proto3 消息类型与 payload 编解码器注册表 |
 | `NetworkMessageRouter` | `assets/scripts/core/network/router/NetworkMessageRouter.ts` | 入站消息路由 |
 | `PushMessageDispatcher` | `assets/scripts/core/network/router/PushMessageDispatcher.ts` | 服务端推送分发 |
 | `AuthTokenProvider` | `assets/scripts/core/network/auth/AuthTokenProvider.ts` | 鉴权 token 提供接口 |
@@ -293,9 +294,64 @@ export interface NetworkProtocolCodec {
 协议策略：
 
 - 初期可以使用 JSON codec，便于调试。
-- 性能敏感或包体敏感时可替换为 binary / protobuf codec。
+- 性能敏感或包体敏感时可替换为 proto3 codec。
 - 业务 Service 不直接依赖 JSON 或二进制细节，只依赖类型化 DTO。
 - codec 失败必须抛协议错误，不能返回空 payload。
+
+### 11.3 Proto3 接入
+
+网络层 proto3 模式采用固定信封 + 业务 payload 注册表：
+
+```proto
+syntax = "proto3";
+
+message NetworkEnvelope {
+  string message_type = 1;
+  string request_id = 2;
+  uint64 sequence_id = 3;
+  uint64 timestamp = 4;
+  bytes payload = 5;
+}
+```
+
+业务消息的 `payload` 使用 `ts-proto` 静态生成代码，再由业务模块或协议初始化阶段注册：
+
+```text
+npm install
+npm run proto:generate
+```
+
+示例 proto 源文件：
+
+```text
+assets/scripts/core/network/examples/proto/example_network.proto
+```
+
+生成目标：
+
+```text
+assets/scripts/core/network/examples/generated/example_network.ts
+```
+
+注册示例：
+
+```ts
+import { BagItemChanged } from './generated/bag'
+
+networkService.registerProto3PayloadCodec({
+  messageType: 'bag.itemChanged',
+  encode: (payload: BagItemChanged) => BagItemChanged.encode(payload).finish(),
+  decode: (bytes: Uint8Array) => BagItemChanged.decode(bytes),
+})
+```
+
+规则：
+
+- `NetworkConfig.protocol` 设为 `'proto3'` 后，WebSocket 使用二进制帧。
+- 未注册 `messageType` 的 payload codec 时，发送或解码直接抛错。
+- `.proto` 只在构建期生成 TS，运行时不动态加载 `.proto` 文件。
+- proto3 只处理协议编解码，不承载业务流程，不直接改业务 Model。
+- 心跳消息 `heartbeat` 默认注册为空 payload；如果服务端需要业务字段，必须显式调整协议约定。
 
 ---
 
@@ -423,7 +479,7 @@ export interface NetworkConfig {
   readonly websocketConnectTimeoutMs: number
   readonly heartbeat: HeartbeatConfig
   readonly reconnect: ReconnectPolicy
-  readonly protocol: 'json' | 'binary'
+  readonly protocol: 'json' | 'proto3'
 }
 ```
 
@@ -487,6 +543,7 @@ sequenceDiagram
 - HTTP 超时、状态码错误、业务错误码必须暴露。
 - WebSocket 未连接时发送消息必须失败。
 - 未注册 messageType 必须暴露协议错误。
+- proto3 模式下未注册 payload codec 必须暴露协议错误。
 - codec 解码失败必须暴露协议错误。
 - 重连超过上限必须暴露失败。
 - 禁止静默重试、无限重试、fallback 伪成功。
@@ -497,7 +554,7 @@ sequenceDiagram
 
 1. 新增 `assets/scripts/core/network` 目录。
 2. 定义 `NetworkConfig`、`NetworkState`、`NetworkError`、`NetworkTypes`。
-3. 实现 `NetworkProtocolCodec` 和 `JsonProtocolCodec`。
+3. 实现 `NetworkProtocolCodec`、`JsonProtocolCodec` 和 `Proto3NetworkProtocolCodec`。
 4. 实现 `HttpClient`、`HttpRequest`、`HttpResponse`、`HttpInterceptor`。
 5. 实现 `WebSocketClient`。
 6. 实现 `HeartbeatService`。

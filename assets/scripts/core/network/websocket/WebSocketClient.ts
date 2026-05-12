@@ -51,6 +51,9 @@ export class WebSocketClient {
 
     await new Promise<void>((resolve, reject) => {
       const socket = new WebSocket(`${url}?token=${encodeURIComponent(token)}`);
+      if (this.codec.transportType === 'binary') {
+        socket.binaryType = 'arraybuffer';
+      }
       this.socket = socket;
 
       socket.onopen = () => {
@@ -77,7 +80,7 @@ export class WebSocketClient {
       };
 
       socket.onmessage = (event) => {
-        this.handleMessage(event.data as string);
+        this.handleMessage(event.data as ArrayBuffer | string);
       };
 
       socket.onclose = () => {

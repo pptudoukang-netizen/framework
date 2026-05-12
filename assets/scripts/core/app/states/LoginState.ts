@@ -24,6 +24,6 @@ export class LoginState extends GameFlowStateBase {
     await network.connectIfNeeded();
     await storage.loadOrCreate();
 
-    await this.transition(GameState.Home);
+    await this.transition(GameState.Hall);
   }
 }

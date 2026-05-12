@@ -8,8 +8,10 @@ import type { AuthTokenProvider } from './auth/AuthTokenProvider';
 import type { NetworkSession } from './auth/NetworkSession';
 import { HttpClient } from './http/HttpClient';
 import type { HttpRequest, HttpResponse } from './http/HttpTypes';
-import { validateNetworkConfig, type NetworkConfig } from './NetworkConfig';
-import { JsonNetworkProtocolCodec } from './protocol/NetworkProtocolCodec';
+import { validateNetworkConfig, type NetworkConfig, type NetworkProtocol } from './NetworkConfig';
+import { EmptyProto3PayloadCodec, MessageTypeRegistry, type Proto3PayloadCodec } from './protocol/MessageTypeRegistry';
+import { JsonNetworkProtocolCodec, type NetworkProtocolCodec } from './protocol/NetworkProtocolCodec';
+import { Proto3NetworkProtocolCodec } from './protocol/Proto3NetworkProtocolCodec';
 import { NetworkMessageRouter, type NetworkPushHandler } from './router/NetworkMessageRouter';
 import { HeartbeatService } from './websocket/HeartbeatService';
 import { WebSocketClient } from './websocket/WebSocketClient';
@@ -26,11 +28,13 @@ export class NetworkService {
   private httpClient: HttpClient | null = null;
   private wsClient: WebSocketClient | null = null;
   private router: NetworkMessageRouter | null = null;
+  private readonly proto3Registry = new MessageTypeRegistry();
 
   public constructor(logger: Logger, eventBus: EventBus<AppEventMap>, timerService: TimerService) {
     this.logger = logger;
     this.eventBus = eventBus;
     this.timerService = timerService;
+    this.proto3Registry.register(new EmptyProto3PayloadCodec('heartbeat'));
   }
 
   public configure(config: NetworkConfig): void {
@@ -43,12 +47,20 @@ export class NetworkService {
     const heartbeat = new HeartbeatService(this.timerService, config.heartbeat);
     this.wsClient = new WebSocketClient(
       this.logger,
-      new JsonNetworkProtocolCodec(),
+      this.createProtocolCodec(config.protocol),
       router,
       heartbeat,
       config.requestTimeoutMs,
     );
     this.router = router;
+  }
+
+  public registerProto3PayloadCodec<TPayload>(codec: Proto3PayloadCodec<TPayload>): void {
+    this.proto3Registry.register(codec);
+  }
+
+  public unregisterProto3PayloadCodec(messageType: string): void {
+    this.proto3Registry.unregister(messageType);
   }
 
   public setAuthTokenProvider(provider: AuthTokenProvider): void {
@@ -149,6 +161,22 @@ export class NetworkService {
     }
 
     return this.router;
+  }
+
+  private createProtocolCodec(protocol: NetworkProtocol): NetworkProtocolCodec {
+    if (protocol === 'json') {
+      return new JsonNetworkProtocolCodec();
+    }
+
+    if (protocol === 'proto3') {
+      return new Proto3NetworkProtocolCodec(this.proto3Registry);
+    }
+
+    throw new FrameworkError({
+      module: 'NetworkService',
+      code: 'UNSUPPORTED_PROTOCOL',
+      message: `Unsupported network protocol '${protocol}'.`,
+    });
   }
 
   private async resolveToken(): Promise<string> {

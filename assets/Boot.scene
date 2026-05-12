@@ -1081,6 +1081,9 @@
     "audioRootNode": {
       "__id__": 26
     },
+    "gameplayRootNode": {
+      "__id__": 23
+    },
     "_id": "abkWmS+BVHh7pwlF744Evy"
   },
   {

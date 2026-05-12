@@ -1,0 +1,32 @@
+syntax = "proto3";
+package framework.network.login;
+
+// @msgid 1001
+message REQ_LOGIN {
+  string device_id = 1;
+  string device_brand = 2;
+  string channel = 3;
+  string client_version = 4;
+}
+
+// @msgid 1002
+message RSP_LOGIN {
+  string name = 1;
+  int32 gems = 2;
+  int64 coins = 3;
+  int32 server_time = 4;
+  uint32 ping_interval = 5;
+  int32 level = 6;
+  string icon = 7;
+  int32 play_total_count = 8;
+  int32 play_win_count = 9;
+  int32 sex = 10;
+  int32 crate_time = 11;
+  int32 result = 12;
+}
+
+// @msgid 1003
+message NTF_LOGOUT {
+  int32 reason = 1;
+  string description = 2;
+}

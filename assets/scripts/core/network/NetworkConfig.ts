@@ -1,5 +1,7 @@
 import { FrameworkError } from '../error/FrameworkError';
 
+export type NetworkProtocol = 'json' | 'proto3';
+
 export interface ReconnectConfig {
   initialDelayMs: number;
   maxDelayMs: number;
@@ -17,6 +19,7 @@ export interface NetworkConfig {
   httpBaseUrl: string;
   wsUrl: string;
   requestTimeoutMs: number;
+  protocol: NetworkProtocol;
   reconnect: ReconnectConfig;
   heartbeat: HeartbeatConfig;
 }
@@ -27,6 +30,17 @@ export function validateNetworkConfig(config: NetworkConfig): void {
       module: 'NetworkConfig',
       code: 'ENDPOINT_MISSING',
       message: 'Network endpoints cannot be empty.',
+    });
+  }
+
+  if (config.protocol !== 'json' && config.protocol !== 'proto3') {
+    throw new FrameworkError({
+      module: 'NetworkConfig',
+      code: 'INVALID_PROTOCOL',
+      message: "Network protocol must be 'json' or 'proto3'.",
+      details: {
+        protocol: config.protocol,
+      },
     });
   }
 

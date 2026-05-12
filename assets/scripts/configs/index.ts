@@ -4,4 +4,6 @@ export * from './ItemConfig';
 export * from './LevelConfig';
 export * from './RewardConfig';
 export * from './ShopConfig';
+export * from './SubGameConfig';
+export * from './SubGameConfigRepository';
 export * from './TaskConfig';

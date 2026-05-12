@@ -1,6 +1,17 @@
 {
   "name": "framework",
   "uuid": "7f143d30-2e61-450f-a73b-ee2c59685324",
+  "scripts": {
+    "hotupdate:manifest": "node tools/hotupdate/generate-manifest.js --config tools/hotupdate/hotupdate.config.json",
+    "proto:generate": "node tools/proto/generate-ts-proto.js"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.12.0"
+  },
+  "devDependencies": {
+    "@protobuf-ts/protoc": "^2.11.1",
+    "ts-proto": "^2.11.8"
+  },
   "creator": {
     "version": "3.8.8"
   }

@@ -1,0 +1,40 @@
+{
+  "targets": [
+    {
+      "name": "full",
+      "version": "1.0.0",
+      "sourceDir": "build/native/data",
+      "outputDir": "assets/resources/hotupdate",
+      "packageUrl": "https://example.com/",
+      "remoteVersionUrl": "https://example.com/version.manifest",
+      "remoteManifestUrl": "https://example.com/project.manifest",
+      "searchPaths": [],
+      "exclude": []
+    },
+    {
+      "name": "shell",
+      "version": "1.0.0",
+      "sourceDir": "build/native/data",
+      "outputDir": "assets/resources/hotupdate/shell",
+      "packageUrl": "https://example.com/shell/",
+      "remoteVersionUrl": "https://example.com/shell/version.manifest",
+      "remoteManifestUrl": "https://example.com/shell/project.manifest",
+      "searchPaths": [],
+      "exclude": [
+        "assets/subgames/**",
+        "subgames/**"
+      ]
+    },
+    {
+      "name": "subgame-exampleGame",
+      "version": "1.0.0",
+      "sourceDir": "build/native/data/assets/subgames/exampleGame",
+      "outputDir": "assets/resources/subgames/exampleGame",
+      "packageUrl": "https://example.com/subgames/exampleGame/",
+      "remoteVersionUrl": "https://example.com/subgames/exampleGame/version.manifest",
+      "remoteManifestUrl": "https://example.com/subgames/exampleGame/project.manifest",
+      "searchPaths": [],
+      "exclude": []
+    }
+  ]
+}

@@ -4,17 +4,20 @@ import { GameState } from './GameState';
 import { BootState } from './states/BootState';
 import { CheckHotUpdateState } from './states/CheckHotUpdateState';
 import { DownloadHotUpdateState } from './states/DownloadHotUpdateState';
-import { HomeState } from './states/HomeState';
+import { HallState } from './states/HallState';
 import { LoadConfigState } from './states/LoadConfigState';
 import { LoginState } from './states/LoginState';
 import { RestartRequiredState } from './states/RestartRequiredState';
-import { BattleState } from './states/BattleState';
-import { SettlementState } from './states/SettlementState';
+import { SubGameLoadingState } from './states/SubGameLoadingState';
+import { SubGameRunningState } from './states/SubGameRunningState';
+import { SubGameSettlementState } from './states/SubGameSettlementState';
 import type { EventBus } from '../event/EventBus';
 import type { AppEventMap } from '../event/AppEventMap';
 import type { Logger } from '../logger/Logger';
 import { StateMachine } from '../fsm/StateMachine';
 import { StateTransitionTable } from '../fsm/StateTransitionTable';
+import type { SubGameEnterParams, SubGameExitReason, SubGameExitResult } from '../gameplay/SubGameTypes';
+import type { SubGameLifecycleService } from '../gameplay/SubGameLifecycleService';
 
 export class GameStateMachine {
   private readonly machine: StateMachine<GameState>;
@@ -43,9 +46,10 @@ export class GameStateMachine {
     this.machine.register(new RestartRequiredState(this.context, logger, transition));
     this.machine.register(new LoadConfigState(this.context, logger, transition));
     this.machine.register(new LoginState(this.context, logger, transition));
-    this.machine.register(new HomeState(this.context, logger, transition));
-    this.machine.register(new BattleState(this.context, logger, transition));
-    this.machine.register(new SettlementState(this.context, logger, transition));
+    this.machine.register(new HallState(this.context, logger, transition));
+    this.machine.register(new SubGameLoadingState(this.context, logger, transition));
+    this.machine.register(new SubGameRunningState(this.context, logger, transition));
+    this.machine.register(new SubGameSettlementState(this.context, logger, transition));
   }
 
   public async start(): Promise<void> {
@@ -54,6 +58,23 @@ export class GameStateMachine {
 
   public async changeTo(nextState: GameState, params?: unknown): Promise<void> {
     await this.machine.changeTo(nextState, params);
+  }
+
+  public async enterSubGame(params: SubGameEnterParams): Promise<void> {
+    await this.changeTo(GameState.SubGameLoading, params);
+  }
+
+  public async exitSubGame(reason: SubGameExitReason): Promise<SubGameExitResult> {
+    const lifecycle = this.context.get(CoreTokens.SubGameLifecycleService) as SubGameLifecycleService;
+    const result = await lifecycle.exit(reason);
+
+    if (result.settlementRequired) {
+      await this.changeTo(GameState.SubGameSettlement, result);
+      return result;
+    }
+
+    await this.changeTo(GameState.Hall, result);
+    return result;
   }
 
   public update(deltaTime: number): void {
@@ -71,9 +92,11 @@ export class GameStateMachine {
     table.allow(GameState.DownloadHotUpdate, GameState.RestartRequired);
     table.allow(GameState.DownloadHotUpdate, GameState.LoadConfig);
     table.allow(GameState.LoadConfig, GameState.Login);
-    table.allow(GameState.Login, GameState.Home);
-    table.allow(GameState.Home, GameState.Battle);
-    table.allow(GameState.Battle, GameState.Settlement);
-    table.allow(GameState.Settlement, GameState.Home);
+    table.allow(GameState.Login, GameState.Hall);
+    table.allow(GameState.Hall, GameState.SubGameLoading);
+    table.allow(GameState.SubGameLoading, GameState.SubGameRunning);
+    table.allow(GameState.SubGameRunning, GameState.SubGameSettlement);
+    table.allow(GameState.SubGameRunning, GameState.Hall);
+    table.allow(GameState.SubGameSettlement, GameState.Hall);
   }
 }

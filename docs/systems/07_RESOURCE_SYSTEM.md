@@ -224,7 +224,7 @@ sequenceDiagram
 - bundleName。
 - path。
 - typeName。
-- resourceVersion。
+- resourceVersion。大厅 + 多子游戏模式下，resourceVersion 必须优先使用 bundle 对应版本。
 
 资源版本变化时：
 
@@ -243,7 +243,7 @@ subgame:<gameId>:<runId>:<resourceVersion>
 
 - `gameId` 来自 `subgame_config`。
 - `runId` 由本次进入子游戏流程生成。
-- `resourceVersion` 来自 `ResourceVersionProvider`。
+- `resourceVersion` 来自 `ResourceVersionProvider.getBundleVersion(bundleName)`。
 - 子游戏退出时必须调用 `releaseByOwner(ownerId)`。
 - 同一子游戏多次进入不能复用旧 ownerId。
 

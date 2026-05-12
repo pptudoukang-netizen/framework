@@ -42,7 +42,7 @@ export class ResourceManager {
     type: typeof Asset,
   ): Promise<ResourceHandle<TAsset>> {
     const safePath = Assert.nonEmptyString(path, 'Resource path cannot be empty.');
-    const version = this.versionProvider.getResourceVersion();
+    const version = this.versionProvider.getBundleVersion(bundleName);
     const key = stringifyResourceKey(createResourceKey(bundleName, safePath, type.name, version));
 
     const cached = this.cache.get(key);

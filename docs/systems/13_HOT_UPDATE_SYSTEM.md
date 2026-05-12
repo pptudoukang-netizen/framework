@@ -52,6 +52,7 @@ assets/resources/hotupdate/
 
 tools/hotupdate/
 ├─ generate-manifest.js
+├─ hotupdate.config.json
 └─ README.md
 ```
 
@@ -59,6 +60,7 @@ tools/hotupdate/
 
 - `assets/resources/hotupdate` 存放随包发布的初始 manifest。
 - `tools/hotupdate` 存放构建期 manifest 生成工具。
+- `tools/hotupdate/hotupdate.config.json` 统一声明全量包、大厅壳包和子游戏 bundle 的生成目标。
 - 原生下载缓存目录不放在 `assets` 中，由 `HotUpdateStorage` / native adapter 管理。
 
 ---
@@ -328,11 +330,39 @@ modules/hotupdate-ui/
 └─ HotUpdateTypes.ts
 ```
 
+---
+
+## 14. 子游戏独立热更新
+
+大厅 + 多子游戏模式下，全局热更新和子游戏热更新分离：
+
+- 全局热更新在启动流程执行，处理框架和公共资源。
+- `subGameIndependentUpdateEnabled=true` 时，全局热更新只处理大厅、框架和公共模块；子游戏热更新在进入子游戏前执行，只处理当前 `gameId` 对应的 bundle。
+- `subGameIndependentUpdateEnabled=false` 时，全局热更新处理整个项目，包含所有子游戏 bundle；进入子游戏时不检查、不下载、不访问该子游戏远端 manifest。
+- 子游戏独立热更新开启时，每个子游戏必须配置 `localManifestPath`、`remoteVersionUrl`、`remoteManifestUrl`。
+- 更新结果必须写入 bundle 级版本，供 `ResourceManager` 和 `BundleLoader` 隔离缓存。
+
+推荐流程：
+
+```text
+SubGameLoadingState
+-> SubGameConfigRepository.get(gameId)
+-> SubGameHotUpdateService.checkAndApply(config)
+-> HotUpdateSearchPathService.persistBundleVersion(bundle, newVersion)
+-> ResourceManager.loadPrefab(bundle, entryPrefab)
+```
+
+Fail-Fast：
+
+- 开关开启但平台不支持热更新，直接报错。
+- 开关开启但 manifest 配置缺失，直接报错。
+- 更新要求重启时，不能继续加载子游戏 bundle。
+
 如果项目希望热更新 UI 保持基础能力，也可以放在 `core/ui` 的 loading/update 面板中，但仍然只能通过 `HotUpdateService` 获取状态。
 
 ---
 
-## 14. Manifest 设计
+## 15. Manifest 设计
 
 manifest 至少需要描述：
 
@@ -346,14 +376,73 @@ manifest 至少需要描述：
 
 构建要求：
 
-- 每次正式出包生成随包 `project.manifest` 和 `version.manifest`。
-- 每次热更新发布生成远端 manifest。
+- 每次正式出包必须通过 `tools/hotupdate/generate-manifest.js` 生成随包 `project.manifest` 和 `version.manifest`。
+- 每次热更新发布必须通过同一脚本生成远端 manifest。
 - 远端资源与 manifest 必须同版本一致。
 - manifest 生成脚本不能使用 mock 数据。
 
+### 15.1 自动生成工具
+
+项目提供 `npm run hotupdate:manifest` 自动生成 manifest，默认读取 `tools/hotupdate/hotupdate.config.json`：
+
+```bash
+npm run hotupdate:manifest
+```
+
+只生成指定目标：
+
+```bash
+npm run hotupdate:manifest -- --target full
+npm run hotupdate:manifest -- --target shell,subgame-exampleGame
+```
+
+临时覆盖版本号：
+
+```bash
+npm run hotupdate:manifest -- --target subgame-exampleGame --version 1.0.1
+```
+
+生成器职责：
+
+- 递归扫描目标 `sourceDir`。
+- 根据 `include` / `exclude` 过滤资源文件。
+- 为每个资源计算 `md5` 和 `size`。
+- 输出 `project.manifest` 和 `version.manifest`。
+- 默认排除 manifest 文件自身、Cocos `.meta` 和常见系统元文件，避免非业务资源进入清单。
+- 缺配置、缺目录、URL 非法、资源为空时直接失败。
+
+当前默认目标：
+
+| 目标 | 用途 | 输出目录 |
+| --- | --- | --- |
+| `full` | 全量更新，包含大厅、公共模块和所有子游戏 | `assets/resources/hotupdate` |
+| `shell` | 大厅壳更新，只包含大厅、框架和公共模块 | `assets/resources/hotupdate/shell` |
+| `subgame-exampleGame` | `exampleGame` 子游戏 bundle 独立更新 | `assets/resources/subgames/exampleGame` |
+
+配置字段：
+
+| 字段 | 要求 |
+| --- | --- |
+| `name` | 目标唯一名称，不允许重复。 |
+| `version` | 写入 manifest 的版本号。 |
+| `sourceDir` | Cocos 构建产物目录，必须存在且至少匹配一个文件。 |
+| `outputDir` | manifest 输出目录，脚本会自动创建。 |
+| `packageUrl` | 远端资源根地址，必须是 HTTP/HTTPS 且以 `/` 结尾。 |
+| `remoteVersionUrl` | 远端 `version.manifest` URL。 |
+| `remoteManifestUrl` | 远端 `project.manifest` URL。 |
+| `searchPaths` | 写入 manifest 的搜索路径数组。 |
+| `include` | 可选，仅包含匹配文件，支持 `*`、`**`、`?`。 |
+| `exclude` | 可选，排除匹配文件，支持 `*`、`**`、`?`。 |
+
+新增子游戏时，需要新增一个 `subgame-<gameId>` 目标，并保证：
+
+- `outputDir` 与 `subgame_config.hotUpdate.localManifestPath` 对齐。
+- `packageUrl`、`remoteVersionUrl`、`remoteManifestUrl` 与 CDN 实际发布路径一致。
+- 大厅壳 `shell.exclude` 已排除该子游戏 bundle，否则独立更新开启时大厅壳会错误包含子游戏资源。
+
 ---
 
-## 15. Fail-Fast 规则
+## 16. Fail-Fast 规则
 
 - 本地 manifest 缺失直接抛错。
 - manifest 字段缺失直接抛错。
@@ -368,7 +457,7 @@ manifest 至少需要描述：
 
 ---
 
-## 16. 开发任务
+## 17. 开发任务
 
 1. 新增 `assets/scripts/core/hotupdate` 目录。
 2. 定义 `HotUpdateState`、`HotUpdateResult`、`HotUpdateEvents`。
@@ -389,7 +478,7 @@ manifest 至少需要描述：
 
 ---
 
-## 17. 验收标准
+## 18. 验收标准
 
 - 原生平台能检查远端版本。
 - 有更新时能下载并汇报进度。
@@ -399,4 +488,5 @@ manifest 至少需要描述：
 - 不支持平台有明确结果，不会伪装成功。
 - ResourceManager 不直接参与下载，但能按更新后的资源路径加载。
 - 热更新失败能显示错误并允许显式重试。
+- Manifest 可通过 `npm run hotupdate:manifest` 自动生成，不需要手工维护资源 `md5` 和 `size`。
 

@@ -48,7 +48,8 @@ export class AppContext {
 
     const errors: FrameworkError[] = [];
 
-    for (const [key, instance] of this.registry.entries()) {
+    const entries = [...this.registry.entries()].reverse();
+    for (const [key, instance] of entries) {
       if (!isDisposable(instance)) {
         continue;
       }

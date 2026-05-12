@@ -6,6 +6,12 @@ export interface HotUpdateConfig {
   readonly remoteManifestUrl: string;
 }
 
+export interface HotUpdateStrategyConfig {
+  readonly subGameIndependentUpdateEnabled: boolean;
+  readonly shellUpdateConfig: HotUpdateConfig;
+  readonly fullUpdateConfig: HotUpdateConfig;
+}
+
 export interface HotUpdateCheckResult {
   readonly status: HotUpdateCheckStatus;
   readonly localVersion: string;

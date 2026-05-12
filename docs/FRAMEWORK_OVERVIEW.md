@@ -36,6 +36,7 @@
 - 玩法、道具、关卡、任务、商城、音频、引导等系统全部数据驱动。
 - 平台 SDK 必须通过 PlatformAdapter 接入，业务层不得直接调用 SDK。
 - 热更新系统只负责版本检查、下载、校验和搜索路径切换，资源加载仍由 ResourceManager 统一执行。
+- Manifest 必须通过 `tools/hotupdate/generate-manifest.js` 自动生成，禁止手工维护资源 `md5` 和 `size`。
 - 网络层使用 HTTP + WebSocket 混合架构，统一鉴权、协议、错误、心跳、重连和消息路由。
 - 大厅 + 多子游戏模式下，`Boot.scene` 只作为单场景运行容器，大厅和子游戏通过模块、配置、UI prefab、玩法 prefab 动态接入。
 - 全框架遵循 fail-fast，禁止 fallback、mock 数据兜底、静默失败。
@@ -106,6 +107,9 @@ framework/
 │  └─ systems/
 ├─ tools/
 │  └─ hotupdate/
+│     ├─ generate-manifest.js
+│     ├─ hotupdate.config.json
+│     └─ README.md
 ├─ package.json
 └─ tsconfig.json
 ```
@@ -119,7 +123,7 @@ framework/
 - `common` 只放纯函数工具，禁止演变成万能 Utils。
 - `core/hotupdate` 放热更新流程和平台 adapter，不放业务 UI。
 - `core/network` 放 HTTP、WebSocket、协议、鉴权、心跳、重连、消息路由。
-- `tools/hotupdate` 放 manifest 生成工具和发布辅助脚本。
+- `tools/hotupdate` 放 manifest 自动生成工具、生成配置和发布辅助说明。
 
 ---
 
